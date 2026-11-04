@@ -75,10 +75,6 @@ internal static partial class Win32
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
-    public const uint LCMAP_SIMPLIFIED_CHINESE = 0x02000000, LCMAP_TRADITIONAL_CHINESE = 0x04000000;
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern int LCMapStringEx(string lpLocaleName, uint dwMapFlags, string lpSrcStr, int cchSrc,
-        [Out] char[]? lpDestStr, int cchDest, IntPtr lpVersionInformation, IntPtr lpReserved, IntPtr sortHandle);
 
     public const uint CRED_TYPE_GENERIC = 1, CRED_PERSIST_LOCAL_MACHINE = 2;
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

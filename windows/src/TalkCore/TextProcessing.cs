@@ -7,9 +7,9 @@ namespace HydayTalk.Core;
 
 public static class TextProcessing
 {
-    /// Simplified-to-Traditional conversion. macOS uses ICU's Hans-Hant transform; the Windows app
-    /// plugs in LCMapStringEx. Left as identity elsewhere (tests, other platforms).
-    public static Func<string, string> ToTraditional { get; set; } = text => text;
+    /// Simplified-to-Traditional conversion (macOS uses ICU's Hans-Hant transform), with OpenCC's
+    /// tables so it behaves the same on every platform.
+    public static Func<string, string> ToTraditional { get; set; } = ChineseConverter.ToTraditional;
 
     private static readonly Regex[] LiteralPatterns =
     [

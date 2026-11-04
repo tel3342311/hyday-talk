@@ -93,7 +93,6 @@ internal sealed class AppController : INotifyPropertyChanged, IDisposable
     public AppController(Dispatcher dispatcher)
     {
         this.dispatcher = dispatcher;
-        TextProcessing.ToTraditional = Native.ScriptConverter.ToTraditional;
         try { Settings = store.Load<TalkSettings>("settings.json") ?? new TalkSettings(); }
         catch { Settings = new TalkSettings(); notice = "無法讀取本機設定，原檔案已備份。請檢查 %APPDATA%\\HydayTalk。"; }
         try { History = store.Load<List<DictationRecord>>("history.json") ?? []; }

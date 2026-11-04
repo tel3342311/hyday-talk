@@ -8,6 +8,9 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\s2t.txt" LogicalName="s2t.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="TalkCore.Tests" />
   </ItemGroup>
 </Project>

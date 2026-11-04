@@ -77,7 +77,7 @@ windows/
 | fn 鍵（CGEventTap） | 右 Ctrl（`WH_KEYBOARD_LL` 低階鍵盤掛鉤） |
 | 輔助使用 AX API | Edit／RichEdit 控制項用 `WM_GETTEXT`、`EM_GETSEL`，其他 App 用 UI Automation |
 | Apple Speech | `Windows.Media.SpeechRecognition` |
-| ICU Hans-Hant | `LCMapStringEx`（`LCMAP_TRADITIONAL_CHINESE`） |
+| ICU Hans-Hant | 內建 OpenCC 繁簡對照表（`src/TalkCore/Resources/s2t.txt`），各平台結果一致 |
 | 鑰匙圈 | 認證管理員（`CredWrite`／`CredRead`） |
 | AVAudioEngine＋afconvert | NAudio，直接錄成 16 kHz 單聲道 WAV |
 | DMG 更新 | zip 更新，App 結束後由 PowerShell 取代檔案並重新開啟 |
@@ -118,4 +118,16 @@ dotnet run --project src/HydayTalk -- --show
 
 ### 驗證
 
-核心邏輯由 `tests/TalkCore.Tests` 驗證；App 曾在 Linux 的 Wine 9 中以實際流程測試：右 Ctrl 聽寫並貼進記事本、翻譯、提問、Esc 取消、記到 Hyday 寫入日誌、失敗後重新處理、修改插入文字後自動學習詞彙，以及透過內建的 whisper-cli.exe 辨識。Wine 沒有實作的部分（UI Automation、Windows 語音辨識、`LCMapStringEx` 的繁簡轉換）需要在 Windows 上確認
+核心邏輯由 `tests/TalkCore.Tests` 驗證；打包好的 zip 曾在 Linux 的 Wine 9 中以實際流程測試，麥克風由 PulseAudio 虛擬音源提供：
+
+- 右 Ctrl 聽寫並貼進記事本、翻譯、提問、Esc 取消、記到 Hyday 寫入日誌
+- 以內建的 whisper-cli.exe 與 whisper.cpp 官方 tiny 模型，辨識真人錄音並插入文字
+- 簡體辨識結果轉為繁體與全形標點後插入
+- 辨識失敗後保留錄音並從面板重新處理
+- 修改插入文字後按 Enter，自動學習詞彙
+
+Wine 沒有實作 UI Automation 與 Windows 語音辨識，這兩項只確認了無法使用時會正常退回（仍可貼上、顯示錯誤），實際效果需要在 Windows 上確認
+
+## 第三方授權
+
+繁簡轉換資料取自 [OpenCC](https://github.com/BYVoid/OpenCC)，以 Apache License 2.0 授權，授權條款見 `src/TalkCore/Resources/OpenCC-LICENSE.txt`
