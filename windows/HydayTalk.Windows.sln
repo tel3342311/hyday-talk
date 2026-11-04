@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A6D7FC4E-2AAE-470E-A1AC-3750B56A1C59}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TalkCore", "src\TalkCore\TalkCore.csproj", "{461ABD9E-DE94-41A3-A5E2-C2BF5761C04F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{67A02D2A-56E7-4592-8192-AC0A38352706}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TalkCore.Tests", "tests\TalkCore.Tests\TalkCore.Tests.csproj", "{1F383F8B-7590-47BF-B031-CB8D4DCE8293}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{461ABD9E-DE94-41A3-A5E2-C2BF5761C04F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{461ABD9E-DE94-41A3-A5E2-C2BF5761C04F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{461ABD9E-DE94-41A3-A5E2-C2BF5761C04F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{461ABD9E-DE94-41A3-A5E2-C2BF5761C04F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F383F8B-7590-47BF-B031-CB8D4DCE8293}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F383F8B-7590-47BF-B031-CB8D4DCE8293}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F383F8B-7590-47BF-B031-CB8D4DCE8293}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F383F8B-7590-47BF-B031-CB8D4DCE8293}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{461ABD9E-DE94-41A3-A5E2-C2BF5761C04F} = {A6D7FC4E-2AAE-470E-A1AC-3750B56A1C59}
+		{1F383F8B-7590-47BF-B031-CB8D4DCE8293} = {67A02D2A-56E7-4592-8192-AC0A38352706}
+	EndGlobalSection
+EndGlobal

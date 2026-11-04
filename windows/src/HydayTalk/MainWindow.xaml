@@ -1,0 +1,225 @@
+<Window x:Class="HydayTalk.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Hyday Talk" Width="760" Height="640" MinWidth="560" MinHeight="480"
+        Background="{StaticResource Workspace}" Foreground="{StaticResource Ink}" WindowStartupLocation="CenterScreen">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Top" Margin="4,0,0,12">
+            <TextBlock Text="Hyday Talk" FontSize="26" FontWeight="SemiBold"/>
+            <TextBlock x:Name="StatusLine" Style="{StaticResource Caption}"/>
+        </StackPanel>
+        <TabControl x:Name="Tabs" Background="{StaticResource Card}" BorderBrush="{StaticResource Border}">
+            <TabItem Header="總覽">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="快捷鍵" Style="{StaticResource Section}" Margin="0,0,0,6"/>
+                        <ItemsControl x:Name="ShortcutList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,3">
+                                        <Border DockPanel.Dock="Right" Background="{StaticResource SubtleSurface}" CornerRadius="6" Padding="8,2">
+                                            <TextBlock Text="{Binding Keys}" FontFamily="Consolas" FontSize="13"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Title}"/>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0"
+                                   Text="Windows 鍵盤不會把 fn 鍵傳給應用程式，所以改用右 Ctrl：按一下開始，再按一下完成。記到 Hyday 尚未在 Windows 版提供。"/>
+                        <TextBlock Text="最近的聽寫" Style="{StaticResource Section}"/>
+                        <TextBlock x:Name="RecentEmpty" Style="{StaticResource Caption}" Text="還沒有聽寫紀錄。在任何 App 的輸入框按右 Ctrl 試試看。"/>
+                        <ItemsControl x:Name="RecentList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="1"
+                                            CornerRadius="12" Padding="12,8" Margin="0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Text}"/>
+                                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Caption}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="語音辨識">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="辨識來源" Style="{StaticResource Section}" Margin="0,0,0,6"/>
+                        <ComboBox x:Name="SpeechBackendBox" SelectionChanged="SpeechBackend_Changed"/>
+                        <TextBlock Text="辨識語言" Style="{StaticResource Caption}"/>
+                        <ComboBox x:Name="LocaleBox" SelectionChanged="Locale_Changed"/>
+
+                        <StackPanel x:Name="LocalSpeechPanel">
+                            <TextBlock Text="本機辨識引擎" Style="{StaticResource Section}"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="選擇 whisper.cpp 的 whisper-cli.exe。使用 Qwen3-ASR 或 TEA-ASR 模型時，transcribe-cli.exe 需放在同一個資料夾。"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="選擇…" Click="BrowseEngine_Click" Margin="8,2,0,8"/>
+                                <TextBox x:Name="EngineBox" LostFocus="Engine_LostFocus"/>
+                            </DockPanel>
+                            <TextBlock Text="本機模型" Style="{StaticResource Section}"/>
+                            <ItemsControl x:Name="ModelList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="1"
+                                                CornerRadius="12" Padding="12,8" Margin="0,4">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="{Binding ActionTitle}" IsEnabled="{Binding CanAct}" Tag="{Binding}" Click="ModelAction_Click" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                                    <TextBlock Style="{StaticResource Caption}" Text="{Binding Detail}"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <DockPanel Margin="0,8,0,0">
+                                <Button DockPanel.Dock="Right" Content="選擇模型檔…" Click="BrowseModel_Click" Margin="8,2,0,8"/>
+                                <TextBox x:Name="ModelPathBox" IsReadOnly="True"/>
+                            </DockPanel>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SpeechAPIPanel">
+                            <TextBlock Text="辨識服務" Style="{StaticResource Section}"/>
+                            <ComboBox x:Name="SpeechProviderBox" SelectionChanged="SpeechProvider_Changed"/>
+                            <TextBlock Text="服務網址" Style="{StaticResource Caption}"/>
+                            <TextBox x:Name="SpeechURLBox" LostFocus="SpeechAPI_LostFocus"/>
+                            <TextBlock Text="模型名稱" Style="{StaticResource Caption}"/>
+                            <TextBox x:Name="SpeechModelBox" LostFocus="SpeechAPI_LostFocus"/>
+                            <TextBlock Text="API Key（存放於 Windows 認證管理員）" Style="{StaticResource Caption}"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="儲存 Key" Click="SaveSpeechKey_Click" Margin="8,2,0,8"/>
+                                <PasswordBox x:Name="SpeechKeyBox"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="文字整理">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="整理方式" Style="{StaticResource Section}" Margin="0,0,0,6"/>
+                        <ComboBox x:Name="TextBackendBox" SelectionChanged="TextBackend_Changed"/>
+                        <TextBlock Text="聽寫風格" Style="{StaticResource Caption}"/>
+                        <ComboBox x:Name="StyleBox" SelectionChanged="Style_Changed"/>
+                        <TextBlock x:Name="StyleDetail" Style="{StaticResource Caption}"/>
+
+                        <StackPanel x:Name="LocalTextPanel">
+                            <TextBlock Text="Ollama 模型" Style="{StaticResource Section}"/>
+                            <TextBlock Style="{StaticResource Caption}" Text="先安裝 Ollama（ollama.com/download），逐字稿只在這台電腦處理。"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="重新整理" Click="RefreshOllama_Click" Margin="8,2,0,8"/>
+                                <ComboBox x:Name="OllamaModelBox" SelectionChanged="OllamaModel_Changed"/>
+                            </DockPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="PullButton" Content="安裝推薦模型 qwen3.5:9b" Click="PullModel_Click"/>
+                                <TextBlock x:Name="PullStatus" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel x:Name="ClaudePanel">
+                            <TextBlock Text="Claude" Style="{StaticResource Section}"/>
+                            <TextBlock x:Name="ClaudeStatus" Style="{StaticResource Caption}"/>
+                            <ComboBox x:Name="ClaudeModelBox" SelectionChanged="ClaudeModel_Changed"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="TextAPIPanel">
+                            <TextBlock Text="文字服務" Style="{StaticResource Section}"/>
+                            <ComboBox x:Name="TextProviderBox" SelectionChanged="TextProvider_Changed"/>
+                            <TextBlock Text="服務網址" Style="{StaticResource Caption}"/>
+                            <TextBox x:Name="TextURLBox" LostFocus="TextAPI_LostFocus"/>
+                            <TextBlock Text="模型名稱" Style="{StaticResource Caption}"/>
+                            <TextBox x:Name="TextModelBox" LostFocus="TextAPI_LostFocus"/>
+                            <TextBlock Text="API Key（存放於 Windows 認證管理員）" Style="{StaticResource Caption}"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="儲存 Key" Click="SaveTextKey_Click" Margin="8,2,0,8"/>
+                                <PasswordBox x:Name="TextKeyBox"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="個人辭典">
+                <DockPanel Margin="20">
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Style="{StaticResource Caption}"
+                                   Text="記錄常說的人名、產品與術語，提供給語音辨識與文字 AI 當提示。常聽錯成可填多個，以「、」或逗號分隔。"/>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="正確寫法" Style="{StaticResource Caption}"/>
+                                <TextBox x:Name="TermBox"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="常聽錯成（選填）" Style="{StaticResource Caption}"/>
+                                <TextBox x:Name="MisheardBox"/>
+                            </StackPanel>
+                            <Button Grid.Column="2" Content="新增" Style="{StaticResource Primary}" Click="AddTerm_Click"
+                                    VerticalAlignment="Bottom" Margin="0,0,0,8"/>
+                        </Grid>
+                    </StackPanel>
+                    <Button DockPanel.Dock="Bottom" Content="刪除選取的詞彙" Click="RemoveTerm_Click" HorizontalAlignment="Left"/>
+                    <ListView x:Name="DictionaryList" Margin="0,8,0,8">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="正確寫法" Width="220" DisplayMemberBinding="{Binding Term}"/>
+                                <GridViewColumn Header="常聽錯成" Width="260" DisplayMemberBinding="{Binding Heard}"/>
+                                <GridViewColumn Header="來源" Width="100" DisplayMemberBinding="{Binding Source}"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="紀錄">
+                <DockPanel Margin="20">
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
+                        <Button Content="複製選取的文字" Click="CopyRecord_Click"/>
+                        <Button Content="清除全部紀錄" Click="ClearHistory_Click"/>
+                    </StackPanel>
+                    <ListView x:Name="HistoryList" Margin="0,0,0,8">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="時間" Width="130" DisplayMemberBinding="{Binding Time}"/>
+                                <GridViewColumn Header="功能" Width="90" DisplayMemberBinding="{Binding Action}"/>
+                                <GridViewColumn Header="文字" Width="460" DisplayMemberBinding="{Binding Text}"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="一般">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <CheckBox x:Name="AutoInsertBox" Content="自動插入到原本的輸入框（關閉時只保留在結果區）" Click="General_Changed"/>
+                        <CheckBox x:Name="SaveHistoryBox" Content="保存聽寫紀錄（最多 200 筆）" Click="General_Changed"/>
+                        <CheckBox x:Name="SoundsBox" Content="開始與完成錄音時播放提示音" Click="General_Changed"/>
+                        <CheckBox x:Name="StartupBox" Content="登入 Windows 時自動啟動" Click="Startup_Changed"/>
+                        <TextBlock Text="翻譯目標語言" Style="{StaticResource Section}"/>
+                        <ComboBox x:Name="TargetLanguageBox" IsEditable="True" LostFocus="TargetLanguage_Changed" SelectionChanged="TargetLanguage_Changed"/>
+                        <TextBlock Text="麥克風" Style="{StaticResource Section}"/>
+                        <ComboBox x:Name="MicrophoneBox" SelectionChanged="Microphone_Changed"/>
+                        <TextBlock Text="資料位置" Style="{StaticResource Section}"/>
+                        <TextBlock x:Name="DataPath" Style="{StaticResource Caption}"/>
+                        <Button Content="開啟資料夾" Click="OpenData_Click" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>
