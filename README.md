@@ -24,7 +24,7 @@ Hyday Talk 為原生 macOS App，語音辨識可在本機完成，錄音不需�
 | 處理器 | Apple Silicon |
 | 本機文字 AI（選用） | Ollama 與已下載的文字模型 |
 
-Windows 版正在開發中，請參閱 [windows/README.md](windows/README.md)
+Windows 版的安裝與說明請參閱 [windows/README.md](windows/README.md)，快捷鍵改用右 Ctrl
 
 ## 安裝
 

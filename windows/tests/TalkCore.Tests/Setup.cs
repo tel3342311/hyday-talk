@@ -8,7 +8,7 @@ internal static class Setup
     [ModuleInitializer]
     internal static void Initialize()
     {
-        var table = new Dictionary<char, char> { ['们'] = '們', ['带'] = '帶', ['价'] = '價', ['谢'] = '謝', ['议'] = '議' };
+        var table = new Dictionary<char, char> { ['们'] = '們', ['带'] = '帶', ['价'] = '價', ['谢'] = '謝', ['议'] = '議', ['讨'] = '討', ['论'] = '論' };
         TextProcessing.ToTraditional = text => new string(text.Select(c => table.GetValueOrDefault(c, c)).ToArray());
     }
 }

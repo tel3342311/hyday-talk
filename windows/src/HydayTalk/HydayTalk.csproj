@@ -1,32 +1,39 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A plain SDK project with a WindowsDesktop framework reference instead of UseWPF: the XAML is
+    embedded and parsed at runtime (see Xaml.cs), so the app builds and publishes for win-x64 from
+    any OS with the .NET 8 SDK, including Linux CI. It only runs on Windows.
+  -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
-    <!-- Lets the project build on Linux/macOS CI; it only runs on Windows. -->
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>HydayTalk</RootNamespace>
     <AssemblyName>HydayTalk</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\HydayTalk.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <Product>Hyday Talk</Product>
     <Company>MUKI</Company>
     <LangVersion>latest</LangVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
   <ItemGroup>
-    <!-- WinForms and WPF both define these names; the app uses the WPF ones. -->
-    <Using Remove="System.Windows.Forms" />
-    <Using Remove="System.Drawing" />
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="**\*.xaml" Exclude="bin\**;obj\**" LogicalName="%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\HydayTalk.ico" LogicalName="HydayTalk.ico" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../TalkCore/TalkCore.csproj" />
+    <ProjectReference Include="..\TalkCore\TalkCore.csproj" />
   </ItemGroup>
 </Project>

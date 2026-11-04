@@ -3,20 +3,33 @@ using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using HydayTalk.Core;
-using HydayTalk.Native;
 using static HydayTalk.Native.Win32;
 
 namespace HydayTalk;
 
 /// Where the user was typing when recording started.
-internal sealed record InputTarget(IntPtr Window, string Name, bool Editable, bool Secure, string Selection);
+internal sealed record InputTarget(IntPtr Window, string Name, string Title, bool Editable, bool Secure, string Selection,
+    IField? Field, string? Text, int? Caret)
+{
+    public ScreenContext Context => new(Name, Title, Text, Caret);
+}
+
+/// The field right after a paste, for reading back the user's corrections later.
+internal sealed record Insertion(InputTarget Target, IField Field, int Location, string Inserted, string After);
 
 /// Inserts text by pasting: the text goes on the clipboard, Ctrl+V is sent to the window the
 /// user started in, and the previous clipboard is restored afterwards.
 internal static class TextInsertion
 {
-    /// Reads the focused window and, through UI Automation, the focused control. UI Automation
-    /// can stall on unresponsive apps, so it gets a short time budget.
+    public static string ForegroundName()
+    {
+        var window = GetForegroundWindow();
+        if (window == IntPtr.Zero) return "";
+        GetWindowThreadProcessId(window, out var pid);
+        return AppName(pid, window);
+    }
+
+    /// Reads the focused window and, through UI Automation, the focused control.
     public static InputTarget? Capture()
     {
         var window = GetForegroundWindow();
@@ -24,27 +37,16 @@ internal static class TextInsertion
         GetWindowThreadProcessId(window, out var pid);
         if (pid == Environment.ProcessId) return null;
         var name = AppName(pid, window);
-        var focus = Task.Run(ReadFocus);
-        var (editable, secure, selection) = focus.Wait(TimeSpan.FromMilliseconds(400)) ? focus.Result : (true, false, "");
-        return new InputTarget(window, name, editable, secure, selection);
-    }
-
-    private static (bool Editable, bool Secure, string Selection) ReadFocus()
-    {
-        try
-        {
-            var element = AutomationElement.FocusedElement;
-            if (element == null) return (false, false, "");
-            var current = element.Current;
-            var type = current.ControlType;
-            var editable = type == ControlType.Edit || type == ControlType.Document || type == ControlType.ComboBox
-                || element.TryGetCurrentPattern(ValuePattern.Pattern, out _) || element.TryGetCurrentPattern(TextPattern.Pattern, out _);
-            var selection = "";
-            if (element.TryGetCurrentPattern(TextPattern.Pattern, out var pattern))
-                selection = string.Join("\n", ((TextPattern)pattern).GetSelection().Select(r => r.GetText(4000))).Trim();
-            return (editable, current.IsPassword, selection);
-        }
-        catch { return (true, false, ""); }
+        var title = new StringBuilder(512);
+        GetWindowText(window, title, title.Capacity);
+        // Classic edit controls answer directly; everything else goes through UI Automation.
+        IField? field = Win32Field.Focused(window);
+        field ??= UiaField.Focused();
+        // Without either, assume a text field and let the paste decide.
+        if (field == null) return new InputTarget(window, name, title.ToString(), true, false, "", null, null, null);
+        // Password fields are never read.
+        if (field.Secure) return new InputTarget(window, name, title.ToString(), true, true, "", null, null, null);
+        return new InputTarget(window, name, title.ToString(), field.Editable, false, field.Selection(), field, field.ReadText(), field.Caret());
     }
 
     private static string AppName(uint pid, IntPtr window)
@@ -53,7 +55,7 @@ internal static class TextInsertion
         {
             using var process = Process.GetProcessById((int)pid);
             var description = process.MainModule?.FileVersionInfo.FileDescription;
-            if (!string.IsNullOrWhiteSpace(description)) return description;
+            if (!string.IsNullOrWhiteSpace(description)) return description.Trim();
             return process.ProcessName;
         }
         catch
@@ -66,21 +68,22 @@ internal static class TextInsertion
 
     public static void Copy(string text)
     {
-        for (var attempt = 0; attempt < 5; attempt++)
+        for (var attempt = 0; attempt < 10; attempt++)
         {
-            try { Clipboard.SetDataObject(text, true); return; }
+            try { Clipboard.SetDataObject(text.Replace("\r\n", "\n").Replace("\n", "\r\n"), true); return; }
             catch (System.Runtime.InteropServices.COMException) { Thread.Sleep(50); }
         }
         throw new TalkException("無法使用剪貼簿，請稍後重試。");
     }
 
-    /// Returns a message for the panel. Throws when the text could only be copied.
-    public static async Task<string> InsertAsync(string text, InputTarget? target)
+    /// Pastes into the target. Returns the panel message and, when the field can be read back,
+    /// where the text landed. Throws when the text could only be copied.
+    public static async Task<(string Message, Insertion? Insertion, bool Delivered)> InsertAsync(string text, InputTarget? target)
     {
         if (target == null || !IsWindow(target.Window) || !target.Editable)
         {
             Copy(text);
-            return "找不到輸入框，文字已複製，可按 Ctrl+V 貼上。";
+            return ("找不到輸入框，文字已複製，可按 Ctrl+V 貼上。", null, false);
         }
         if (GetForegroundWindow() != target.Window && !SetForegroundWindow(target.Window))
         {
@@ -88,24 +91,38 @@ internal static class TextInsertion
             throw new TalkException("輸入位置已變更，文字已複製，可按 Ctrl+V 貼上。");
         }
         var saved = SaveClipboard();
+        var field = target.Field;
+        // Read just before pasting: the user may have typed while the text was being processed.
+        var before = field == null ? null : await Task.Run(field.ReadText);
         Copy(text);
         await Task.Delay(30);
         if (GetForegroundWindow() != target.Window)
-        {
             throw new TalkException("輸入位置已變更，文字已複製，可按 Ctrl+V 貼上。");
-        }
         SendPaste();
         // The target reads the clipboard asynchronously; wait before putting the old contents back.
         await Task.Delay(800);
-        RestoreClipboard(saved, text);
-        return $"已插入到 {target.Name}。";
+        RestoreClipboard(saved);
+        Insertion? insertion = null;
+        if (field != null && before != null)
+        {
+            var after = await Task.Run(field.ReadText);
+            if (after != null && after != before)
+            {
+                // The paste replaced whatever was selected, so it begins where the two texts first differ.
+                var location = 0;
+                while (location < before.Length && location < after.Length && before[location] == after[location]) location++;
+                if (location > 0 && char.IsLowSurrogate(after[location - 1]) ) location--;
+                insertion = new Insertion(target, field, location, Uia.Normalize(text), after);
+            }
+        }
+        return ($"已插入到 {target.Name}。", insertion, true);
     }
 
     private static void SendPaste()
     {
         // Release modifiers the user may still be holding (Right Ctrl, Shift, Alt), then Ctrl+V.
         var keys = new List<INPUT>();
-        foreach (var vk in new[] { VK_RCONTROL, VK_LSHIFT, VK_RSHIFT, VK_LMENU, VK_RMENU })
+        foreach (var vk in new[] { VK_RCONTROL, VK_LCONTROL, VK_LSHIFT, VK_RSHIFT, VK_LMENU, VK_RMENU })
             if ((GetAsyncKeyState(vk) & 0x8000) != 0) keys.Add(Key(vk, up: true));
         keys.Add(Key(VK_CONTROL, false)); keys.Add(Key(VK_V, false)); keys.Add(Key(VK_V, true)); keys.Add(Key(VK_CONTROL, true));
         var array = keys.ToArray();
@@ -134,12 +151,10 @@ internal static class TextInsertion
         catch { return null; }
     }
 
-    private static void RestoreClipboard(DataObject? saved, string inserted)
+    private static void RestoreClipboard(DataObject? saved)
     {
         try
         {
-            // Leave the clipboard alone if something else replaced it in the meantime.
-            if (Clipboard.ContainsText() && Clipboard.GetText() != inserted) return;
             if (saved == null || saved.GetFormats().Length == 0) Clipboard.Clear();
             else Clipboard.SetDataObject(saved, true);
         }

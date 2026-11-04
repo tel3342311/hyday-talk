@@ -15,7 +15,7 @@ public enum WritingStyle { Verbatim, Natural, Professional }
 public static class SpeechBackends
 {
     /// System recognition (Apple Speech) and the CLI backend are macOS-only; Windows offers these.
-    public static readonly SpeechBackend[] Available = [SpeechBackend.Whisper, SpeechBackend.Api];
+    public static readonly SpeechBackend[] Available = [SpeechBackend.System, SpeechBackend.Whisper, SpeechBackend.Api];
 
     public static string Title(this SpeechBackend backend) => backend switch
     {
@@ -27,7 +27,7 @@ public static class SpeechBackends
 
     public static string Detail(this SpeechBackend backend) => backend switch
     {
-        SpeechBackend.System => "使用系統語音辨識",
+        SpeechBackend.System => "使用 Windows 語音辨識",
         SpeechBackend.Whisper => "在這台電腦離線辨識",
         SpeechBackend.Cli => "自訂辨識工具與執行參數",
         _ => "連接 OpenAI 相容的服務",
@@ -92,6 +92,15 @@ public static class WritingStyles
         WritingStyle.Natural => "保留口語語氣與情緒並補上標點，刪除多餘的贅詞與思考片段，適合日常訊息。",
         WritingStyle.Verbatim => "保留辨識原文的字句，僅套用字形、既有標點與個人辭典，不使用 AI 改寫。",
         _ => "刪除所有贅詞，改用清楚簡潔的書面用語並補上標點，適合工作郵件與文件。",
+    };
+
+    public const string ExampleInput = "呃明天下午3點要開會，然後再麻煩Amy把API文件帶過來這樣";
+
+    public static string ExampleOutput(this WritingStyle style) => style switch
+    {
+        WritingStyle.Natural => "明天下午3點要開會，再麻煩Amy把API文件帶過來。",
+        WritingStyle.Verbatim => ExampleInput,
+        _ => "明天下午3點開會，請Amy攜帶API文件。",
     };
 
     public static string Instruction(this WritingStyle style) => style switch
@@ -161,6 +170,35 @@ public sealed class TalkSettings
     public string? HydayFolder { get; set; }
     /// Saved per-device so the recorder can be pinned to a headset instead of the default input.
     public int? MicrophoneDevice { get; set; }
+    public bool SystemOfflineOnly { get; set; }
+    // Optional so settings saved by earlier versions still read; null means the default.
+    public bool? LearnFromCorrections { get; set; }
+    public List<DictionaryEntry>? BlockedCorrections { get; set; }
+    public int? TypingSpeed { get; set; }
+    public bool? AskHydayNotes { get; set; }
+    public bool? ReadScreenContext { get; set; }
+    public List<string>? ScreenContextExcluded { get; set; }
+    public string? KeepRecordings { get; set; }
+
+    [JsonIgnore] public bool LearnsFromCorrections { get => LearnFromCorrections ?? true; set => LearnFromCorrections = value; }
+    /// Used to estimate time saved; 40 sits in the common 20–50 range for Taiwanese Zhuyin typists.
+    [JsonIgnore] public int TypingWordsPerMinute { get => TypingSpeed ?? 40; set => TypingSpeed = value; }
+    /// Text questions answer from notes found in the Hyday folder; off by default.
+    [JsonIgnore] public bool AsksHydayNotes { get => AskHydayNotes ?? false; set => AskHydayNotes = value; }
+    [JsonIgnore] public RecordingRetention RecordingRetention { get => RecordingRetention.Parse(KeepRecordings); set => KeepRecordings = value.Code; }
+    /// Local text AI keeps screen text on this computer, so it is on by default; an API or Claude sends it out, so it is off.
+    [JsonIgnore]
+    public bool ReadsScreenContext
+    {
+        get => ReadScreenContext ?? (TextBackend != TextBackend.Api && TextBackend != TextBackend.Claude);
+        set => ReadScreenContext = value;
+    }
+    [JsonIgnore]
+    public List<string> ScreenContextExcludedApps { get => ScreenContextExcluded ?? [.. ScreenContext.DefaultExcludedApps]; set => ScreenContextExcluded = value; }
+
+    public bool ShouldReadScreenContext(VoiceAction action, string app) =>
+        ReadsScreenContext && action != VoiceAction.Ask && TextBackend != TextBackend.Basic && RequiresTextModel(action)
+        && !ScreenContextExcludedApps.Any(a => string.Equals(a, app, StringComparison.OrdinalIgnoreCase));
 
     [JsonIgnore] public string LanguageCode => Locale.Length >= 2 ? Locale[..2] : Locale;
     [JsonIgnore] public string ClaudeModel => string.IsNullOrEmpty(ClaudeTextModel) ? ClaudeTextModels.Recommended : ClaudeTextModel;

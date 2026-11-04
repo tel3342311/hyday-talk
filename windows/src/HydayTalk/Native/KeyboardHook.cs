@@ -14,10 +14,16 @@ internal sealed class KeyboardHook : IDisposable
     private readonly LowLevelKeyboardProc proc;
     private readonly HashSet<uint> down = [];
     private IntPtr hook;
+    // Some keyboard drivers, remote desktop clients and Wine report Right Ctrl together with a
+    // Left Ctrl event a few milliseconds apart; that pair is one key, not a chord.
+    private const uint PairWindow = 50;
+    private uint leftCtrlTime, triggerTime;
 
     public Func<bool> IsRecording { get; set; } = () => false;
     /// Raised on the hook thread (the UI thread that installed it); handlers must return quickly.
     public event Action<ShortcutAction>? Action;
+    /// Enter was pressed: inserted text is about to be sent, so corrections are read now.
+    public event Action? ReturnPressed;
 
     public KeyboardHook() { proc = Callback; }
 
@@ -26,6 +32,7 @@ internal sealed class KeyboardHook : IDisposable
         if (hook != IntPtr.Zero) return true;
         using var module = Process.GetCurrentProcess().MainModule;
         hook = SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(module?.ModuleName), 0);
+        Log.Write($"hook installed: {hook != IntPtr.Zero}");
         return hook != IntPtr.Zero;
     }
 
@@ -44,6 +51,7 @@ internal sealed class KeyboardHook : IDisposable
         var message = (int)wParam;
         var isDown = message is WM_KEYDOWN or WM_SYSKEYDOWN;
         var vk = info.vkCode;
+        Log.Write($"key {vk:X2} {(isDown ? "down" : "up")}");
         var repeated = isDown && !down.Add(vk);
         if (!isDown) down.Remove(vk);
         var swallow = false;
@@ -52,8 +60,19 @@ internal sealed class KeyboardHook : IDisposable
         {
             case VK_RCONTROL:
                 if (!repeated)
-                    action = state.TriggerChanged(isDown, IsDown(VK_LSHIFT), otherModifier: IsDown(VK_LCONTROL) || IsDown(VK_RSHIFT)
+                {
+                    if (isDown) triggerTime = info.time;
+                    var leftCtrlHeld = IsDown(VK_LCONTROL) && info.time - leftCtrlTime > PairWindow;
+                    action = state.TriggerChanged(isDown, IsDown(VK_LSHIFT), otherModifier: leftCtrlHeld || IsDown(VK_RSHIFT)
                         || IsDown(VK_RMENU) || IsDown(VK_LWIN) || IsDown(VK_RWIN), askModifier: IsDown(VK_LMENU));
+                }
+                break;
+            case VK_LCONTROL:
+                if (isDown && !repeated)
+                {
+                    leftCtrlTime = info.time;
+                    if (!(state.TriggerDown && info.time - triggerTime <= PairWindow)) state.OtherModifierChanged();
+                }
                 break;
             case VK_LSHIFT: action = state.ShiftChanged(isDown); break;
             case VK_LMENU:
@@ -61,11 +80,12 @@ internal sealed class KeyboardHook : IDisposable
                 // Alt pressed during the chord would otherwise open the target app's menu bar.
                 swallow = state.TriggerDown;
                 break;
-            case VK_LCONTROL or VK_RSHIFT or VK_RMENU or VK_LWIN or VK_RWIN:
+            case VK_RSHIFT or VK_RMENU or VK_LWIN or VK_RWIN:
                 if (isDown) state.OtherModifierChanged();
                 break;
             default:
                 if (!isDown) break;
+                if (vk == VK_RETURN && !repeated && !state.TriggerDown) ReturnPressed?.Invoke();
                 var key = vk switch { VK_SPACE => ShortcutKey.Space, VK_ESCAPE => ShortcutKey.Escape, _ => ShortcutKey.Other };
                 var chord = state.TriggerDown;
                 action = state.KeyDown(key, repeated, IsRecording());
@@ -73,7 +93,7 @@ internal sealed class KeyboardHook : IDisposable
                 swallow = action != null || (chord && key == ShortcutKey.Space);
                 break;
         }
-        if (action is { } fired) Action?.Invoke(fired);
+        if (action is { } fired) { Log.Write($"shortcut {fired}"); Action?.Invoke(fired); }
         return swallow ? 1 : CallNextHookEx(hook, nCode, wParam, lParam);
     }
 

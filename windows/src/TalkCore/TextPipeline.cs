@@ -1,10 +1,10 @@
 namespace HydayTalk.Core;
 
-public sealed record PipelineResult(string Text, string Notice);
+public sealed record PipelineResult(string Text, string Notice, bool AIFormatted);
 
 /// The part of a dictation after recognition: clean-up, the optional text AI pass and output
-/// formatting. Platform pieces (API keys, the Claude process) are passed in.
-public sealed class TextPipeline(Func<string, string> readKey, Func<ClaudeSession?> claude, HttpClient? client = null)
+/// formatting. Platform pieces (API keys, the Claude process, the Hyday folder) are passed in.
+public sealed class TextPipeline(Func<string, string> readKey, Func<ClaudeSession?> claude, Func<string?> hydayRoot, HttpClient? client = null)
 {
     public async Task<string> CompleteAsync(string prompt, TalkSettings settings, CancellationToken cancellation)
     {
@@ -22,15 +22,35 @@ public sealed class TextPipeline(Func<string, string> readKey, Func<ClaudeSessio
         }
     }
 
-    public async Task<PipelineResult> RunAsync(string raw, VoiceAction action, string selection, TalkSettings settings, CancellationToken cancellation)
+    /// Notes for 問筆記: searched only when it is on and a text AI will read them.
+    private async Task<List<HydayNote>?> NotesAsync(string text, string selection, TalkSettings settings, CancellationToken cancellation)
+    {
+        if (!settings.AsksHydayNotes || settings.TextBackend == TextBackend.Basic || hydayRoot() is not { } root) return null;
+        var query = string.Join(" ", new[] { text, selection }.Where(s => s.Length > 0));
+        if (query.Length > 200) query = query[..200];
+        return await HydaySearchService.NotesAsync(root, query, cancellation: cancellation);
+    }
+
+    private async Task<string> ProcessAsync(string text, string selection, VoiceAction action, TalkSettings settings,
+        ScreenContext? context, CancellationToken cancellation)
+    {
+        var notes = action == VoiceAction.Ask ? await NotesAsync(text, selection, settings, cancellation) : null;
+        return await CompleteAsync(TextProcessing.Prompt(action, text, selection, settings, notes, context), settings, cancellation);
+    }
+
+    public async Task<PipelineResult> RunAsync(string raw, VoiceAction action, string selection, TalkSettings settings,
+        CancellationToken cancellation, ScreenContext? context = null)
     {
         var cleaned = TextProcessing.Clean(raw, settings);
-        var output = cleaned; var notice = "";
+        var output = cleaned; var notice = ""; var aiFormatted = false;
         if (settings.RequiresTextModel(action) && settings.TextBackend != TextBackend.Basic)
         {
             try
             {
-                var processed = await CompleteAsync(TextProcessing.Prompt(action, cleaned, selection, settings), settings, cancellation);
+                var processed = await ProcessAsync(cleaned, selection, action, settings, context, cancellation);
+                // The AI copied screen text; redo the clean-up without it.
+                if (context != null && context.Leaked(processed, cleaned))
+                    processed = await ProcessAsync(cleaned, selection, action, settings, null, cancellation);
                 output = action == VoiceAction.Dictate ? TextProcessing.CheckedDictationOutput(processed, cleaned) : processed;
                 if (action == VoiceAction.Dictate && (settings.DictationLayout ?? DictationLayout.Automatic) == DictationLayout.Automatic
                     && ParagraphLayout.NeedsLayout(output))
@@ -39,22 +59,33 @@ public sealed class TextPipeline(Func<string, string> readKey, Func<ClaudeSessio
                     catch (OperationCanceledException) { throw; }
                     catch { }
                 }
+                aiFormatted = true;
             }
             catch (OperationCanceledException) { throw; }
-            catch when (action == VoiceAction.Dictate)
+            catch when (action is VoiceAction.Dictate or VoiceAction.Hyday)
             {
-                output = cleaned; notice = "AI 整理未完成，已保留原始辨識文字。";
+                output = cleaned;
+                notice = action == VoiceAction.Dictate ? "AI 整理未完成，已保留原始辨識文字。" : "AI 整理未完成，已記成一般列點。";
             }
         }
-        return new PipelineResult(TextProcessing.FormatOutput(output, action, settings), notice);
+        return new PipelineResult(TextProcessing.FormatOutput(output, action, settings), notice, aiFormatted);
+    }
+
+    /// The journal lines for a Hyday entry: AI-classified marks, or one plain bullet, stamped with when it was spoken.
+    public static string HydayEntry(PipelineResult result, DateTime spokeAt)
+    {
+        var time = HydayEntryFormatting.Time(spokeAt);
+        var formatted = result.AIFormatted ? HydayEntryFormatting.Entry(result.Text, time) : "";
+        return HydayEntryFormatting.Stamped(formatted.Length == 0 ? HydayVault.Bullet(result.Text) : formatted, time);
     }
 
     /// Checks a snapshot of the settings before recording, so problems surface before the user speaks.
     public void Validate(TalkSettings settings, VoiceAction action)
     {
-        if (action == VoiceAction.Hyday) throw new TalkException("Windows 版尚未支援記到 Hyday。");
+        if (action == VoiceAction.Hyday && hydayRoot() == null) throw new TalkException("請先在 Hyday 頁設定 Hyday 資料夾。");
         switch (settings.SpeechBackend)
         {
+            case SpeechBackend.System: break;
             case SpeechBackend.Whisper:
                 var engine = LocalSpeechModel.EngineFor(settings.WhisperModel) == SpeechEngine.Qwen
                     ? SpeechTranscription.QwenExecutable(settings) : settings.WhisperExecutable;
@@ -64,7 +95,7 @@ public sealed class TextPipeline(Func<string, string> readKey, Func<ClaudeSessio
             case SpeechBackend.Api: ValidateAPI(settings.SpeechAPI, "speech"); break;
             default: throw new TalkException("Windows 版不支援這個辨識來源，請改用本機模型或 API。");
         }
-        if (action != VoiceAction.Dictate && settings.TextBackend == TextBackend.Basic)
+        if (action is VoiceAction.Translate or VoiceAction.Ask && settings.TextBackend == TextBackend.Basic)
             throw new TalkException("翻譯與提問需要文字 AI，請在「文字整理」選擇本機 AI 或 API Key。");
         if (!settings.RequiresTextModel(action)) return;
         switch (settings.TextBackend)

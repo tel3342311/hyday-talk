@@ -8,7 +8,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  # Tests, cross-builds the recognition engines with mingw and packages the zip, all on Linux.
+  package:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test core
+        run: dotnet test tests/TalkCore.Tests -c Release
+      - name: Install mingw-w64
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64-posix cmake zip
+      - name: Cache recognition engines
+        uses: actions/cache@v4
+        with:
+          path: windows/.build/runtime
+          key: runtime-mingw-${{ hashFiles('windows/scripts/build-runtime-mingw.sh') }}
+      - name: Build recognition engines
+        run: test -f .build/runtime/transcribe-cli.exe || ./scripts/build-runtime-mingw.sh
+      - name: Package
+        run: ./scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hyday-talk-windows
+          path: windows/dist/*.zip
+
+  # Builds the app on Windows itself, with engines compiled by MSVC.
+  windows:
     runs-on: windows-latest
     defaults:
       run:
@@ -20,18 +50,9 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Test core
         run: dotnet test tests/TalkCore.Tests -c Release
-      - name: Cache recognition engines
-        uses: actions/cache@v4
-        with:
-          path: windows/.build/runtime
-          key: runtime-${{ hashFiles('windows/scripts/build-runtime.ps1') }}
       - name: Build recognition engines
         shell: pwsh
-        run: if (-not (Test-Path .build/runtime/transcribe-cli.exe)) { ./scripts/build-runtime.ps1 }
+        run: ./scripts/build-runtime.ps1
       - name: Package
         shell: pwsh
         run: ./scripts/package.ps1 -SkipRuntime
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hyday-talk-windows
-          path: windows/dist/*.zip
