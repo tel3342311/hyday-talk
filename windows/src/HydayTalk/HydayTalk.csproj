@@ -31,6 +31,12 @@
     <EmbeddedResource Include="Assets\HydayTalk.ico" LogicalName="HydayTalk.ico" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The local recognition engines (see runtime/README.md) go next to HydayTalk.exe in runtime\,
+         for dotnet build, dotnet run and dotnet publish alike. -->
+    <Content Include="..\..\runtime\**\*.exe;..\..\runtime\**\*.dll" Link="runtime\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
   </ItemGroup>
   <ItemGroup>

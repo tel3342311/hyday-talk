@@ -109,6 +109,7 @@ internal sealed class AppController : INotifyPropertyChanged, IDisposable
         if (Settings.WhisperModel.Length == 0 || !File.Exists(Settings.WhisperModel))
             Settings.WhisperModel = new[] { LocalSpeechModel.QwenSmall, LocalSpeechModel.Tea, LocalSpeechModel.QwenLarge, LocalSpeechModel.WhisperTurbo }
                 .Select(m => Path.Combine(ModelDirectory, m.Filename)).FirstOrDefault(File.Exists) ?? Settings.WhisperModel;
+        ProcessRunner.Diagnostics = Log.Write;
         Recordings = new RecordingStore(Path.Combine(store.Directory, "Recordings"));
 
         pipeline = new TextPipeline(KeyStore.Read, Claude, () => HydayRoot);
@@ -273,6 +274,7 @@ internal sealed class AppController : INotifyPropertyChanged, IDisposable
             else
             {
                 var file = await audio.StopAsync();
+                Log.Write($"recording stopped, {new FileInfo(file).Length} bytes");
                 // Saved before transcribing, so a failure can be retried from the history page.
                 if (snapshot.RecordingRetention.Kind != RetentionKind.Off)
                     try { Recordings.Save(file, recordId); saved = true; } catch { }
@@ -359,7 +361,9 @@ internal sealed class AppController : INotifyPropertyChanged, IDisposable
         if (settings.SpeechBackend == SpeechBackend.System)
             throw new TalkException("Windows 語音辨識只能即時聽寫，請改用本機模型或 API 重新處理錄音。");
         var key = settings.SpeechBackend == SpeechBackend.Api ? KeyStore.Read("speech") : "";
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         var raw = await Task.Run(() => SpeechTranscription.TranscribeAsync(file, settings, key, hints, cancellation: token), token);
+        Log.Write($"transcribed with {settings.SpeechBackend} in {clock.ElapsedMilliseconds} ms");
         if (RecognitionHints.IsEcho(raw, hints))
             raw = await Task.Run(() => SpeechTranscription.TranscribeAsync(file, settings, key, [], cancellation: token), token);
         if (RecognitionHints.IsEcho(raw, hints)) throw new TalkException("沒有辨識到文字，請再試一次。");

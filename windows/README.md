@@ -98,30 +98,40 @@ dotnet build src/HydayTalk
 dotnet run --project src/HydayTalk -- --show
 ```
 
-### 打包
+### 辨識引擎
 
-在 Linux 以 mingw-w64 交叉編譯辨識引擎並打包，需要 `cmake`、`zip` 與 `g++-mingw-w64-x86-64-posix`：
+`runtime/` 收錄已建置好的 whisper-cli.exe 與 transcribe-cli.exe（來源、版本與授權見 `runtime/README.md`），建置時會複製到 `HydayTalk.exe` 旁的 `runtime\`，`dotnet run` 也能直接使用本機模型。引擎為每種 CPU 指令集各附一個 `ggml-cpu-*.dll`，執行時自動選用最快的版本，不需要安裝 Visual C++ 可轉散發套件
+
+更新引擎時，在 Linux 以 mingw-w64 交叉編譯（需要 `cmake` 與 `g++-mingw-w64-x86-64-posix`）：
 
 ```bash
 ./scripts/build-runtime-mingw.sh
-./scripts/package.sh
 ```
 
-在 Windows 以 Visual Studio C++ 建置工具編譯辨識引擎並打包：
+或在 Windows 以 Visual Studio C++ 建置工具編譯：
 
 ```powershell
 ./scripts/build-runtime.ps1
-./scripts/package.ps1 -SkipRuntime
 ```
 
-兩種方式都會從與 macOS 版相同的固定版本建置 whisper.cpp 與 transcribe.cpp，輸出 `windows/dist/Hyday-Talk-<版本>-win-x64.zip`
+### 打包
+
+輸出自帶 .NET 執行環境與辨識引擎的 `windows/dist/Hyday-Talk-<版本>-win-x64.zip`：
+
+```bash
+./scripts/package.sh
+```
+
+```powershell
+./scripts/package.ps1
+```
 
 ### 驗證
 
 核心邏輯由 `tests/TalkCore.Tests` 驗證；打包好的 zip 曾在 Linux 的 Wine 9 中以實際流程測試，麥克風由 PulseAudio 虛擬音源提供：
 
 - 右 Ctrl 聽寫並貼進記事本、翻譯、提問、Esc 取消、記到 Hyday 寫入日誌
-- 以內建的 whisper-cli.exe 與 whisper.cpp 官方 tiny 模型，辨識真人錄音並插入文字
+- 以內建的 whisper-cli.exe 與 whisper.cpp 官方 tiny 模型，辨識真人錄音並插入文字（11 秒錄音約 1.7 秒辨識完成）
 - 簡體辨識結果轉為繁體與全形標點後插入
 - 辨識失敗後保留錄音並從面板重新處理
 - 修改插入文字後按 Enter，自動學習詞彙

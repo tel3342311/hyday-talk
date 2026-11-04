@@ -38,9 +38,15 @@ public static class SpeechTranscription
         return ValidatedText(output);
     }
 
-    /// The Qwen3-ASR engine ships next to whisper-cli inside the app.
-    public static string QwenExecutable(TalkSettings settings) =>
-        Path.Combine(Path.GetDirectoryName(settings.WhisperExecutable) ?? "", OperatingSystem.IsWindows() ? "transcribe-cli.exe" : "transcribe-cli");
+    /// The Qwen3-ASR engine ships with whisper-cli: in its own transcribe\ folder on Windows, since it
+    /// carries its own ggml DLLs, or right next to it.
+    public static string QwenExecutable(TalkSettings settings)
+    {
+        var folder = Path.GetDirectoryName(settings.WhisperExecutable) ?? "";
+        var name = OperatingSystem.IsWindows() ? "transcribe-cli.exe" : "transcribe-cli";
+        var nested = Path.Combine(folder, "transcribe", name);
+        return File.Exists(nested) ? nested : Path.Combine(folder, name);
+    }
 
     public static List<string> QwenArguments(TalkSettings settings, string file, string output, IReadOnlyList<string> hints)
     {

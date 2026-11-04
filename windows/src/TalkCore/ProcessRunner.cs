@@ -5,6 +5,9 @@ namespace HydayTalk.Core;
 
 public static class ProcessRunner
 {
+    /// Receives the command lines run, for the app's troubleshooting log.
+    public static Action<string>? Diagnostics { get; set; }
+
     /// Runs a tool without a shell and returns its standard output; the whole process tree is
     /// stopped on cancellation or timeout so wrapper children do not linger.
     public static async Task<string> RunAsync(string executable, IEnumerable<string> arguments, string? input = null,
@@ -20,6 +23,7 @@ public static class ProcessRunner
             WorkingDirectory = Path.GetDirectoryName(path)!,
         };
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
+        Diagnostics?.Invoke($"run {Path.GetFileName(path)} {string.Join(' ', info.ArgumentList.Select(a => a.Contains(' ') ? '"' + a + '"' : a))}");
         using var process = new Process { StartInfo = info };
         try { process.Start(); }
         catch { throw new TalkException("無法啟動 CLI。請確認工具可執行，且相依環境已安裝。"); }

@@ -89,7 +89,8 @@ public sealed class TextPipeline(Func<string, string> readKey, Func<ClaudeSessio
             case SpeechBackend.Whisper:
                 var engine = LocalSpeechModel.EngineFor(settings.WhisperModel) == SpeechEngine.Qwen
                     ? SpeechTranscription.QwenExecutable(settings) : settings.WhisperExecutable;
-                if (!File.Exists(engine)) throw new TalkException("找不到本機辨識引擎，請在「語音辨識」選擇 whisper-cli.exe。");
+                if (!File.Exists(engine))
+                    throw new TalkException($"找不到本機辨識引擎 {Path.GetFileName(engine)}。Hyday Talk 資料夾中應有 runtime 資料夾，請重新下載或建置，或在「語音辨識」選擇引擎。");
                 if (!File.Exists(settings.WhisperModel)) throw new TalkException("請在「語音辨識」下載並選擇本機模型。");
                 break;
             case SpeechBackend.Api: ValidateAPI(settings.SpeechAPI, "speech"); break;

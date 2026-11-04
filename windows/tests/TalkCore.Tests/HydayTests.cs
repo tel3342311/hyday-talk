@@ -263,3 +263,17 @@ public class HydaySearchServiceTests
         Assert.Empty(HydaySearchService.ParseHits("not json"));
     }
 }
+
+public class EngineLayoutTests
+{
+    [Fact]
+    public void QwenEngineIsFoundInItsOwnFolderOrNextToWhisper()
+    {
+        using var folder = new TempFolder();
+        var whisper = folder.Write("runtime/whisper-cli", "");
+        var settings = new TalkSettings { WhisperExecutable = whisper };
+        Assert.Equal(Path.Combine(folder.Root, "runtime", "transcribe-cli"), SpeechTranscription.QwenExecutable(settings));
+        var nested = folder.Write("runtime/transcribe/transcribe-cli", "");
+        Assert.Equal(nested, SpeechTranscription.QwenExecutable(settings));
+    }
+}
